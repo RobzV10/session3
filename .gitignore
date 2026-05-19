@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore dataset and training artifacts
+/data/*.csv
+/model/*.pt
+/model/*.pkl
+/model/*.json
+
+# Allow directory placeholders
+!.gitkeep

@@ -1,0 +1,64 @@
+name: Train and Upload to Hugging Face
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  train-and-upload:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train model
+        run: python train.py
+
+      - name: Upload Hugging Face model artifacts
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          token = os.environ.get("HF_TOKEN")
+          if not token:
+              raise SystemExit("HF_TOKEN is required for Hugging Face upload.")
+
+          repo_id = os.environ.get("HF_REPO_ID") or os.environ["GITHUB_REPOSITORY"]
+          api = HfApi()
+          api.create_repo(repo_id=repo_id, token=token, exist_ok=True)
+
+          artifacts = ["model.pt", "vectorizer.pkl", "config.json", "metrics.json"]
+          for artifact in artifacts:
+              path = os.path.join("model", artifact)
+              if not os.path.exists(path):
+                  raise FileNotFoundError(f"Missing artifact: {path}")
+              api.upload_file(
+                  path_or_fileobj=path,
+                  path_in_repo=artifact,
+                  repo_id=repo_id,
+                  token=token,
+              )
+              print(f"Uploaded {artifact} to {repo_id}")
+
+          print(f"Model artifacts uploaded to https://huggingface.co/{repo_id}")
+          EOF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO_ID: ${{ secrets.HF_REPO_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
